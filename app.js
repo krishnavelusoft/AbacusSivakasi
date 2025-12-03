@@ -11,7 +11,7 @@ function showError(err){
 }
 
 function loadPage(page){
-  fetch(`pages/${page}.html`).then(res => {
+  fetch(`/${page}.html`).then(res => {
     if(!res.ok) throw new Error('Not found');
     return res.text();
   }).then(html => {
