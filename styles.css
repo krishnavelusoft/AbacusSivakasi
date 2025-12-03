@@ -1,0 +1,32 @@
+:root {
+  --sidebar-bg: #111827;
+  --sidebar-contrast: #1f2937;
+  --accent: #3b82f6;
+  --content-bg: #f9fafb;
+}
+
+* {box-sizing: border-box}
+html,body {height:100%}
+body {margin:0;font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; color:#111827}
+
+.app {display:flex;height:100vh}
+
+.sidebar {width:240px;background:var(--sidebar-bg);color:#fff;display:flex;flex-direction:column}
+.sidebar-header {padding:20px;border-bottom:1px solid rgba(255,255,255,0.06)}
+.sidebar-header h1 {margin:0;font-size:1.25rem}
+
+.menu {list-style:none;padding:8px;margin:0}
+.menu li {margin:4px 0}
+.menu a {display:block;padding:10px 14px;color:inherit;text-decoration:none;border-radius:6px}
+.menu a:hover {background:var(--sidebar-contrast)}
+.menu a.active {background:var(--accent);color:#fff}
+
+.content {flex:1;padding:24px;background:var(--content-bg);overflow:auto}
+.content h2 {margin-top:0}
+
+@media (max-width:700px) {
+  .app {flex-direction:column}
+  .sidebar {width:100%;display:flex;flex-direction:row;align-items:center}
+  .menu {display:flex;gap:8px}
+  .menu a {padding:8px 10px}
+}
