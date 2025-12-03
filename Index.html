@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Split Menu Layout</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <header class="sidebar-header">
+        <h1>Site</h1>
+      </header>
+      <nav>
+        <ul class="menu">
+          <li><a href="#" data-page="home" class="active">Home</a></li>
+          <li><a href="#" data-page="about">About</a></li>
+          <li><a href="#" data-page="contact">Contact</a></li>
+        </ul>
+      </nav>
+    </aside>
+
+    <main class="content" id="content">
+      <!-- Page content will be loaded here -->
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
