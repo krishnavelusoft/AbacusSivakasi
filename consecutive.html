@@ -1,0 +1,30 @@
+<Section>
+    <h1>Abacus Sivakasi</h1>
+    <p>Enter start and end numbers:</p>
+    <input type="number" id="start" placeholder="Start" min="1">
+    <input type="number" id="end" placeholder="End" min="1">
+    <br>
+    <button onclick="generateSequence()">Generate Sequence</button>
+
+    <div id="result"></div>
+
+    <script>
+        function generateSequence() {
+            const start = parseInt(document.getElementById('start').value);
+            const end = parseInt(document.getElementById('end').value);
+            const resultDiv = document.getElementById('result');
+
+            if (isNaN(start) || isNaN(end) || start > end) {
+                resultDiv.innerHTML = '<p style="color:red;">Please enter valid numbers (start ≤ end).</p>';
+                return;
+            }
+
+            let sequence = '';
+            for (let i = start; i <= end; i++) {
+                sequence += i + ' ';
+            }
+
+            resultDiv.innerHTML = `<strong>Consecutive numbers from ${start} to ${end}:</strong><br>${sequence}`;
+        }
+    </script>
+</Section>
