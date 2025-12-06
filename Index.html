@@ -117,6 +117,7 @@
         <button onclick="showPage('evenNum')">EVEN Number</button>
         <button onclick="showPage('DQR')">Division Quotient & Remainder</button>
         <button onclick="showPage('CC')">Callenge Corner</button>
+        <button onclick="showPage('BN')">Beacutiful Number</button>
         <button onclick="showPage('contact')">Contact</button>
     </div>
 
@@ -189,11 +190,11 @@
                     const row = tbody.insertRow();
                     const balanceClass = currentBalance === 0 ? 'zero-balance' : 'remaining';
                     row.innerHTML = `
-                                                            <td class="consec-number">${currentNumber}</td>
-                                                            <td class="running-total">${runningTotal}</td>
-                                                            <td class="running-total">${runningTotal}</td>
-                                                            <td class="${balanceClass}">${currentBalance}</td>
-                                                        `;
+                                                                    <td class="consec-number">${currentNumber}</td>
+                                                                    <td class="running-total">${runningTotal}</td>
+                                                                    <td class="running-total">${runningTotal}</td>
+                                                                    <td class="${balanceClass}">${currentBalance}</td>
+                                                                `;
                 }
 
                 rangeDisplay.textContent = `${start} to ${end}`;
@@ -269,11 +270,11 @@
                     const row = tbody.insertRow();
                     const balanceClass = currentBalance === 0 ? 'zero-balance' : 'remaining';
                     row.innerHTML = `
-                                                            <td class="odd-number">${oddNumber}</td>
-                                                            <td class="running-total">${runningTotal}</td>
-                                                            <td class="running-total">${runningTotal}</td>
-                                                            <td class="${balanceClass}">${currentBalance}</td>
-                                                        `;
+                                                                    <td class="odd-number">${oddNumber}</td>
+                                                                    <td class="running-total">${runningTotal}</td>
+                                                                    <td class="running-total">${runningTotal}</td>
+                                                                    <td class="${balanceClass}">${currentBalance}</td>
+                                                                `;
                 }
 
                 oddCount.textContent = n;
@@ -350,11 +351,11 @@
                     const row = tbody.insertRow();
                     const balanceClass = currentBalance === 0 ? 'zero-balance' : 'remaining';
                     row.innerHTML = `
-                                                                              <td class="even-number">${evenNumber}</td>
-                                                                              <td class="running-total">${runningTotal}</td>
-                                                                              <td class="running-total">${runningTotal}</td>
-                                                                              <td class="${balanceClass}">${currentBalance}</td>
-                                                                          `;
+                                                                                      <td class="even-number">${evenNumber}</td>
+                                                                                      <td class="running-total">${runningTotal}</td>
+                                                                                      <td class="running-total">${runningTotal}</td>
+                                                                                      <td class="${balanceClass}">${currentBalance}</td>
+                                                                                  `;
                 }
 
                 evenCount.textContent = n;
@@ -418,10 +419,10 @@
 
                     const row = tbody.insertRow();
                     row.innerHTML = `
-                                            <td><strong>${divisor}</strong></td>
-                                            <td class="quotient">${quotient}</td>
-                                            <td class="remainder">${remainder}</td>
-                                        `;
+                                                    <td><strong>${divisor}</strong></td>
+                                                    <td class="quotient">${quotient}</td>
+                                                    <td class="remainder">${remainder}</td>
+                                                `;
                 });
 
                 inputNumber.textContent = number;
@@ -435,52 +436,80 @@
     <div id="CC" class="content">
         <div>
             <h1>Challenge Corner</h1>
-        <div>
-            <input type="number" id="startNumCC" value="1000" placeholder="Start (1000)">
-            <input type="number" id="subtractNumCC" value="197" placeholder="Subtract (197)">
-            <button onclick="generateTable()">Generate Table</button>
+            <div>
+                <input type="number" id="startNumCC" value="1000" placeholder="Start (1000)">
+                <input type="number" id="subtractNumCC" value="197" placeholder="Subtract (197)">
+                <button onclick="generateTable()">Generate Table</button>
+            </div>
+            <table id="resultTableCC" style="display: none;">
+                <thead>
+                    <tr>
+                        <th>Step</th>
+                        <th>Current Value</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBodyCC"></tbody>
+            </table>
         </div>
-        <table id="resultTableCC" style="display: none;">
-            <thead>
-                <tr>
-                    <th>Step</th>
-                    <th>Current Value</th>
-                </tr>
-            </thead>
-            <tbody id="tableBodyCC"></tbody> 
-        </table>
-    </div>
 
-    <script>
-        function generateTable() {
-            const startNum = parseInt(document.getElementById('startNumCC').value);
-            const subtractNum = parseInt(document.getElementById('subtractNumCC').value);
-            const tableBody = document.getElementById('tableBodyCC');
-            const table = document.getElementById('resultTableCC');
+        <script>
+            function generateTable() {
+                const startNum = parseInt(document.getElementById('startNumCC').value);
+                const subtractNum = parseInt(document.getElementById('subtractNumCC').value);
+                const tableBody = document.getElementById('tableBodyCC');
+                const table = document.getElementById('resultTableCC');
 
-            tableBody.innerHTML = '';
-            let currentValue = startNum;
-            let step = 1;
+                tableBody.innerHTML = '';
+                let currentValue = startNum;
+                let step = 1;
 
-            while (currentValue > 0) {
-                const row = tableBody.insertRow();
-                row.insertCell(0).textContent = step;
-                const valueCell = row.insertCell(1);
-                valueCell.textContent = currentValue;
+                while (currentValue > 0) {
+                    const row = tableBody.insertRow();
+                    row.insertCell(0).textContent = step;
+                    const valueCell = row.insertCell(1);
+                    valueCell.textContent = currentValue;
 
-                if (currentValue <= subtractNum * 2) {
-                    valueCell.className = 'low-value';
+                    if (currentValue <= subtractNum * 2) {
+                        valueCell.className = 'low-value';
+                    }
+
+                    currentValue -= subtractNum;
+                    step++;
                 }
 
-                currentValue -= subtractNum;
-                step++;
+                table.style.display = 'table';
+                // Scroll to table
+                table.scrollIntoView({ behavior: 'smooth' });
             }
+        </script>
+    </div>
 
-            table.style.display = 'table';
-            // Scroll to table
-            table.scrollIntoView({ behavior: 'smooth' });
-        }
-    </script>
+    <div id="BN" class="content">
+        <h2>Add Same Number Multiple Times</h2>
+        <label>Number to add: <input type="number" id="numBN" value="5"></label>
+        <label>Times: <input type="number" id="timesBN" value="10"></label>
+        <button onclick="generateTableBN()">Generate Table</button>
+        <div id="tableContainerBN"></div>
+
+        <script>
+            function generateTableBN() {
+                const num = parseInt(document.getElementById('numBN').value);
+                const times = parseInt(document.getElementById('timesBN').value);
+                let html = '<table><tr><th>Step</th><th>Expression</th><th>Total</th></tr>';
+                let total = 0;
+
+                for (let i = 1; i <= times; i++) {
+                    total += num;
+                    html += `<tr>
+                            <td>${i}</td>
+                            <td>${num} + ${num} + ... (${i} times)</td>
+                            <td>${total}</td>
+                        </tr>`;
+                }
+                html += '</table>';
+                document.getElementById('tableContainerBN').innerHTML = html;
+            }
+        </script>
     </div>
 
     <div id="contact" class="content">
