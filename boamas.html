@@ -1,0 +1,734 @@
+﻿
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>BODMAS Random Sum Generator — Step-by-step (with Negative/Decimal options)</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <style>
+        body {
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+            max-width: 1000px;
+            margin: 24px auto;
+            padding: 0 16px;
+            color: #111;
+        }
+
+        h1 {
+            margin-bottom: 6px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        label {
+            display: inline-flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .panel {
+            margin-top: 12px;
+            padding: 12px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            background: #fafafa;
+        }
+
+        .expr {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+
+        button {
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid #bbb;
+            background: #fff;
+            cursor: pointer;
+        }
+
+            button.primary {
+                background: #0b76ef;
+                color: #fff;
+                border-color: #0b6ae7;
+            }
+
+        .steps {
+            margin-top: 8px;
+        }
+
+        .step {
+            padding: 6px 8px;
+            border-radius: 6px;
+            background: #fff;
+            border: 1px solid #eee;
+            margin-bottom: 6px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+
+        .note {
+            font-size: 0.9rem;
+            color: #555;
+            margin-top: 8px;
+        }
+
+        .controls-right {
+            margin-left: auto;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        input[type=number] {
+            width: 70px;
+            padding: 6px;
+        }
+
+        .small {
+            font-size: 0.9rem;
+            color: #444;
+        }
+    </style>
+</head>
+<body>
+    <h1>BODMAS Random Sum Generator</h1>
+    <p>Select which operators and features to include. Click "Refresh" to generate a new random expression and see a detailed step-by-step BODMAS evaluation.</p>
+
+    <div class="controls">
+        <label><input type="checkbox" id="cb-brackets" checked /> Brackets</label>
+        <label><input type="checkbox" id="cb-mul" checked /> Multiplication (×)</label>
+        <label><input type="checkbox" id="cb-div" checked /> Division (÷)</label>
+        <label><input type="checkbox" id="cb-add" checked /> Addition (+)</label>
+        <label><input type="checkbox" id="cb-sub" checked /> Subtraction (−)</label>
+
+        <!-- New options: control whether the final result can be negative and/or decimal -->
+        <label><input type="checkbox" id="cb-allow-negative" /> Allow Negative Result</label>
+        <label><input type="checkbox" id="cb-allow-decimal" /> Allow Decimal Result</label>
+
+        <div class="controls-right">
+            <label class="small">Terms: <input id="num-terms" type="number" min="2" max="8" value="4" title="Number of operands (2-8)"></label>
+            <button id="btn-refresh" class="primary">Refresh</button>
+            <button id="btn-copy">Copy Expression</button>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="expr" id="expression">—</div>
+        <div><strong>Result:</strong> <span id="final-result">—</span></div>
+
+        <div class="steps" id="steps"></div>
+        <div class="note">
+            Notes:
+            - Division results are shown with up to 6 decimal places for clarity.
+            - Steps follow: brackets first, then multiplication/division (left-to-right), then addition/subtraction (left-to-right).
+            - If "Allow Decimal Result" is unchecked, the generator will retry until it finds an expression with an integer final result.
+            - If "Allow Negative Result" is unchecked, the generator will retry until it finds a non-negative final result.
+        </div>
+    </div>
+
+    <script>
+        // Utility: get random integer in [min, max]
+        function randInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+
+        // Format numbers: if integer, no decimals, else round to 6 decimals trimming trailing zeros
+        function fmtNum(n) {
+            if (!isFinite(n)) return String(n);
+            if (Math.abs(n - Math.round(n)) < 1e-9) return String(Math.round(n));
+            return String(parseFloat(n.toFixed(6))).replace(/\.?0+$/, '');
+        }
+
+        // Join tokens to printable expression string with spaces and nice symbols
+        function tokensToString(tokens) {
+            return tokens.map(t => {
+                if (t === '*' || t === '/') return t === '*' ? '×' : '÷';
+                return String(t);
+            }).join(' ');
+        }
+
+        // Generate random expression tokens according to selected operations and bracket setting
+        function generateTokens(selectedOps, allowBrackets, numTerms) {
+            // Build operands (positive integers between 1 and 20)
+            const operands = [];
+            for (let i = 0; i < numTerms; i++) operands.push(String(randInt(1, 20)));
+
+            // Build operators between them using only selectedOps
+            const ops = [];
+            for (let i = 0; i < numTerms - 1; i++) {
+                const op = selectedOps[Math.floor(Math.random() * selectedOps.length)];
+                ops.push(op);
+            }
+
+            // Interleave into tokens
+            const tokens = [];
+            for (let i = 0; i < operands.length; i++) {
+                tokens.push(operands[i]);
+                if (i < ops.length) tokens.push(ops[i]);
+            }
+
+            // Possibly add one pair of brackets around a contiguous subexpression (length >= 3 tokens: num operands >=2)
+            if (allowBrackets && Math.random() < 0.75 && numTerms >= 2) {
+                // choose subexpression covering at least two operands
+                const startOperandIdx = randInt(0, numTerms - 2);
+                const endOperandIdx = randInt(startOperandIdx + 1, Math.min(numTerms - 1, startOperandIdx + 2)); // bracket length 2 or 3 operands
+                const startToken = 2 * startOperandIdx;
+                const endToken = 2 * endOperandIdx;
+                // Insert ')' after endToken first (so indices don't shift erroneously)
+                tokens.splice(endToken + 1, 0, ')');
+                tokens.splice(startToken, 0, '(');
+            }
+
+            return tokens;
+        }
+
+        // Evaluate a flat expression (no parentheses) with BODMAS: first * and / left-to-right, then + and - left-to-right
+        // tokens here are an array like ['4','*','5','-','2','/','2'] where numbers are strings
+        function evalFlat(tokens, stepCallback) {
+            let toks = tokens.slice();
+            // Normalize numeric tokens into strings representing numbers (no change needed)
+            // First pass: * and /
+            let i = 0;
+            while (i < toks.length) {
+                const tok = toks[i];
+                if (tok === '*' || tok === '/') {
+                    const a = parseFloat(toks[i - 1]);
+                    const b = parseFloat(toks[i + 1]);
+                    let res;
+                    if (tok === '*') res = a * b;
+                    else res = a / b;
+                    res = parseFloat(res.toFixed(12)); // maintain precision
+                    toks.splice(i - 1, 3, fmtNum(res));
+                    stepCallback(`${fmtNum(a)} ${tok === '*' ? '×' : '÷'} ${fmtNum(b)} = ${fmtNum(res)}  →  ${tokensToString(toks)}`);
+                    i = Math.max(0, i - 2);
+                } else i++;
+            }
+            // Second pass: + and -
+            i = 0;
+            while (i < toks.length) {
+                const tok = toks[i];
+                if (tok === '+' || tok === '-') {
+                    const a = parseFloat(toks[i - 1]);
+                    const b = parseFloat(toks[i + 1]);
+                    let res;
+                    if (tok === '+') res = a + b;
+                    else res = a - b;
+                    res = parseFloat(res.toFixed(12));
+                    toks.splice(i - 1, 3, fmtNum(res));
+                    stepCallback(`${fmtNum(a)} ${tok} ${fmtNum(b)} = ${fmtNum(res)}  →  ${tokensToString(toks)}`);
+                    i = Math.max(0, i - 2);
+                } else i++;
+            }
+            return toks.length === 1 ? parseFloat(toks[0]) : NaN;
+        }
+
+        // Evaluate tokens which may include parentheses. Returns {result, steps}
+        function evaluateTokens(tokens) {
+            const steps = [];
+            function recStep(text) { steps.push(text); }
+
+            // Work on mutable copy
+            let toks = tokens.slice();
+
+            // Loop until no parentheses left
+            while (toks.includes('(')) {
+                // find last '(' (innermost)
+                let openIdx = -1;
+                for (let i = 0; i < toks.length; i++) if (toks[i] === '(') openIdx = i;
+                let closeIdx = toks.indexOf(')', openIdx + 1);
+                if (openIdx === -1 || closeIdx === -1) break; // mismatched, stop
+                const sub = toks.slice(openIdx + 1, closeIdx);
+                recStep(`Evaluate inside brackets: ${tokensToString(sub)}`);
+
+                // local callback updates full expression display after each local operation
+                const localCb = (msg) => {
+                    // message contains "… →  <local tokens>" at end; extract the local tokens string if present
+                    const arrow = msg.indexOf('→');
+                    let currentLocalStr = tokensToString(sub);
+                    if (arrow !== -1) currentLocalStr = msg.slice(arrow + 1).trim();
+                    // build display: replace bracketed range with the currentLocalStr
+                    const display = toks.slice(0, openIdx).concat([currentLocalStr]).concat(toks.slice(closeIdx + 1));
+                    recStep(display.join(' '));
+                };
+
+                const subResult = evalFlat(sub, localCb);
+
+                // Replace entire '( ... )' with subResult formatted
+                toks.splice(openIdx, closeIdx - openIdx + 1, fmtNum(subResult));
+                recStep(`Brackets computed -> ${tokensToString(toks)}`);
+            }
+
+            // Now no parentheses left, evaluate the remaining flat expression
+            recStep(`Now evaluate: ${tokensToString(toks)}`);
+            const final = evalFlat(toks, (msg) => recStep(msg));
+            recStep(`Final result: ${fmtNum(final)}`);
+
+            return { result: final, steps };
+        }
+
+        // UI wiring
+        const btn = document.getElementById('btn-refresh');
+        const exprEl = document.getElementById('expression');
+        const stepsEl = document.getElementById('steps');
+        const resultEl = document.getElementById('final-result');
+        const copyBtn = document.getElementById('btn-copy');
+
+        function getSelectedOps() {
+            const ops = [];
+            if (document.getElementById('cb-mul').checked) ops.push('*');
+            if (document.getElementById('cb-div').checked) ops.push('/');
+            if (document.getElementById('cb-add').checked) ops.push('+');
+            if (document.getElementById('cb-sub').checked) ops.push('-');
+            return ops;
+        }
+
+        function isIntegerValue(n) {
+            return isFinite(n) && Math.abs(n - Math.round(n)) < 1e-9;
+        }
+
+        function satisfiesConstraints(result, negativeAllowed, decimalAllowed) {
+            if (!isFinite(result) || Number.isNaN(result)) return false;
+            if (!negativeAllowed && result < 0) return false; // require non-negative if negatives not allowed
+            if (!decimalAllowed && !isIntegerValue(result)) return false; // require integer if decimals not allowed
+            return true;
+        }
+
+        function generateAndShow() {
+            const selectedOps = getSelectedOps();
+            const allowBrackets = document.getElementById('cb-brackets').checked;
+            const numTermsInput = parseInt(document.getElementById('num-terms').value, 10) || 4;
+            const numTerms = Math.min(8, Math.max(2, numTermsInput));
+            const allowNegative = document.getElementById('cb-allow-negative').checked;
+            const allowDecimal = document.getElementById('cb-allow-decimal').checked;
+
+            if (selectedOps.length === 0) {
+                alert('Pick at least one of Multiplication, Division, Addition, or Subtraction.');
+                return;
+            }
+
+            // Attempt multiple times until a generated expression satisfies the constraints
+            const maxAttempts = 1000;
+            let attempt = 0;
+            let finalTokens = null;
+            let finalEval = null;
+
+            while (attempt < maxAttempts) {
+                attempt++;
+                const tokens = generateTokens(selectedOps, allowBrackets, numTerms);
+                const { result, steps } = evaluateTokens(tokens);
+                if (satisfiesConstraints(result, allowNegative, allowDecimal)) {
+                    finalTokens = tokens;
+                    finalEval = { result, steps };
+                    break;
+                }
+            }
+
+            if (!finalTokens) {
+                alert('Could not generate an expression satisfying the selected constraints after many attempts. Try relaxing options (e.g., allow decimal or negative results, enable more operators, or increase terms).');
+                // As fallback, generate one expression without constraint enforcement so user still sees something
+                const tokens = generateTokens(selectedOps, allowBrackets, numTerms);
+                finalTokens = tokens;
+                finalEval = evaluateTokens(tokens);
+            }
+
+            // Show expression and evaluation steps
+            exprEl.textContent = tokensToString(finalTokens);
+            stepsEl.innerHTML = '';
+            resultEl.textContent = '…';
+
+            finalEval.steps.forEach((s, idx) => {
+                const div = document.createElement('div');
+                div.className = 'step';
+                div.textContent = `Step ${idx + 1}: ${s}`;
+                stepsEl.appendChild(div);
+            });
+
+            resultEl.textContent = fmtNum(finalEval.result);
+        }
+
+        // initial generate
+        generateAndShow();
+
+        btn.addEventListener('click', generateAndShow);
+
+        copyBtn.addEventListener('click', () => {
+            const txt = exprEl.textContent;
+            navigator.clipboard?.writeText(txt).then(() => {
+                copyBtn.textContent = 'Copied!';
+                setTimeout(() => copyBtn.textContent = 'Copy Expression', 1100);
+            }).catch(() => {
+                alert('Copy failed. Select and copy manually: ' + txt);
+            });
+        });
+    </script>
+</body>
+</html>
+
+
+
+
+<!--<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>BODMAS Random Sum Generator — Step-by-step</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <style>
+        body {
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+            max-width: 900px;
+            margin: 24px auto;
+            padding: 0 16px;
+            color: #111;
+        }
+
+        h1 {
+            margin-bottom: 6px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        label {
+            display: inline-flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .panel {
+            margin-top: 12px;
+            padding: 12px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            background: #fafafa;
+        }
+
+        .expr {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+
+        button {
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid #bbb;
+            background: #fff;
+            cursor: pointer;
+        }
+
+            button.primary {
+                background: #0b76ef;
+                color: #fff;
+                border-color: #0b6ae7;
+            }
+
+        .steps {
+            margin-top: 8px;
+        }
+
+        .step {
+            padding: 6px 8px;
+            border-radius: 6px;
+            background: #fff;
+            border: 1px solid #eee;
+            margin-bottom: 6px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+
+        .note {
+            font-size: 0.9rem;
+            color: #555;
+            margin-top: 8px;
+        }
+
+        .controls-right {
+            margin-left: auto;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        input[type=number] {
+            width: 70px;
+            padding: 6px;
+        }
+    </style>
+</head>
+<body>
+    <h1>BODMAS Random Sum Generator</h1>
+    <p>Select which concepts to include. Click "Refresh" to generate a new random expression and see a step-by-step evaluation following BODMAS order.</p>
+
+    <div class="controls">
+        <label><input type="checkbox" id="cb-brackets" checked /> Brackets</label>
+        <label><input type="checkbox" id="cb-mul" checked /> Multiplication (×)</label>
+        <label><input type="checkbox" id="cb-div" checked /> Division (÷)</label>
+        <label><input type="checkbox" id="cb-add" checked /> Addition (+)</label>
+        <label><input type="checkbox" id="cb-sub" checked /> Subtraction (−)</label>
+
+        <div class="controls-right">
+            <label>Terms: <input id="num-terms" type="number" min="2" max="8" value="4" title="Number of operands (2-8)"></label>
+            <button id="btn-refresh" class="primary">Refresh</button>
+            <button id="btn-copy">Copy Expression</button>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="expr" id="expression">—</div>
+        <div><strong>Result:</strong> <span id="final-result">—</span></div>
+
+        <div class="steps" id="steps"></div>
+        <div class="note">Notes: division results are rounded to 6 decimal places for clarity. Steps follow brackets first, then multiplication/division left-to-right, then addition/subtraction left-to-right.</div>
+    </div>
+
+    <script>
+        // Utility: get random integer in [min, max]
+        function randInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+
+        // Format numbers: if integer, no decimals, else round to 6 decimals trimming trailing zeros
+        function fmtNum(n) {
+            if (Number.isInteger(n)) return String(n);
+            return String(parseFloat(n.toFixed(6))).replace(/\.?0+$/, '');
+        }
+
+        // Join tokens to printable expression string with spaces and nice symbols
+        function tokensToString(tokens) {
+            return tokens.map(t => (t === '*' ? '×' : t === '/' ? '÷' : t)).join(' ');
+        }
+
+        // Generate random expression tokens according to selected operations and bracket setting
+        function generateTokens(selectedOps, allowBrackets, numTerms) {
+            // Build operands
+            const operands = [];
+            for (let i = 0; i < numTerms; i++) operands.push(String(randInt(1, 20)));
+
+            // Build operators between them using only selectedOps
+            const ops = [];
+            for (let i = 0; i < numTerms - 1; i++) {
+                const op = selectedOps[Math.floor(Math.random() * selectedOps.length)];
+                ops.push(op);
+            }
+
+            // Interleave into tokens
+            const tokens = [];
+            for (let i = 0; i < operands.length; i++) {
+                tokens.push(operands[i]);
+                if (i < ops.length) tokens.push(ops[i]);
+            }
+
+            // Possibly add one pair of brackets around a contiguous subexpression (length >= 3 tokens: num operands >=2)
+            if (allowBrackets && Math.random() < 0.65 && numTerms >= 2) {
+                // choose subexpression covering at least two operands
+                const startOperandIdx = randInt(0, numTerms - 2);
+                const endOperandIdx = randInt(startOperandIdx + 1, Math.min(numTerms - 1, startOperandIdx + 2)); // bracket length 2 or 3 operands
+                // Convert to token indices: operand i is at token index 2*i
+                const startToken = 2 * startOperandIdx;
+                const endToken = 2 * endOperandIdx;
+                // Insert '(' at startToken, ')' after endToken
+                tokens.splice(endToken + 1, 0, ')'); // after endToken
+                tokens.splice(startToken, 0, '('); // before startToken (note indices shift but it's fine because we inserted end first)
+            }
+
+            return tokens;
+        }
+
+        // Evaluate a flat expression (no parentheses) with BODMAS: first * and / left-to-right, then + and - left-to-right
+        // tokens here are an array like ['4','*','5','-','2','/','2'] where numbers are strings
+        function evalFlat(tokens, stepCallback) {
+            // convert numbers to actual numbers
+            let toks = tokens.slice();
+            // first pass: * and /
+            let i = 0;
+            while (i < toks.length) {
+                const tok = toks[i];
+                if (tok === '*' || tok === '/') {
+                    const a = parseFloat(toks[i - 1]);
+                    const b = parseFloat(toks[i + 1]);
+                    let res;
+                    if (tok === '*') res = a * b;
+                    else res = a / b;
+                    res = parseFloat(res.toFixed(12)); // keep precision
+                    // replace [i-1, i, i+1] with result
+                    toks.splice(i - 1, 3, fmtNum(res));
+                    stepCallback(`${fmtNum(a)} ${tok === '*' ? '×' : '÷'} ${fmtNum(b)} = ${fmtNum(res)}  →  ${tokensToString(toks)}`);
+                    i = Math.max(0, i - 2);
+                } else i++;
+            }
+            // second pass: + and -
+            i = 0;
+            while (i < toks.length) {
+                const tok = toks[i];
+                if (tok === '+' || tok === '-') {
+                    const a = parseFloat(toks[i - 1]);
+                    const b = parseFloat(toks[i + 1]);
+                    let res;
+                    if (tok === '+') res = a + b;
+                    else res = a - b;
+                    res = parseFloat(res.toFixed(12));
+                    toks.splice(i - 1, 3, fmtNum(res));
+                    stepCallback(`${fmtNum(a)} ${tok} ${fmtNum(b)} = ${fmtNum(res)}  →  ${tokensToString(toks)}`);
+                    i = Math.max(0, i - 2);
+                } else i++;
+            }
+            return toks.length === 1 ? parseFloat(toks[0]) : NaN;
+        }
+
+        // Evaluate tokens which may include parentheses. Returns {result, steps}
+        function evaluateTokens(tokens) {
+            const steps = [];
+            // Helper to call step recording
+            function recStep(text) { steps.push(text); }
+
+            // Work on a mutable copy
+            let toks = tokens.slice();
+
+            // Loop until no parentheses left
+            while (toks.includes('(')) {
+                // find last '(' (innermost)
+                let openIdx = -1;
+                for (let i = 0; i < toks.length; i++) if (toks[i] === '(') openIdx = i;
+                // find next ')' after openIdx
+                let closeIdx = toks.indexOf(')', openIdx + 1);
+                if (openIdx === -1 || closeIdx === -1) {
+                    // mismatched parentheses; break
+                    break;
+                }
+                // extract subexpression tokens between openIdx+1 and closeIdx-1
+                const sub = toks.slice(openIdx + 1, closeIdx);
+                // record current subexpression
+                recStep(`Evaluate inside brackets: ${tokensToString(sub)}`);
+                // evaluate flat subexpression with its own step callbacks that show updated global expression
+                const localSteps = [];
+                const localStepCb = (msg) => {
+                    // when a local operation occurs, replace sub in global toks with the current local tokens for display
+                    // we need to rebuild global tokens: replace range [openIdx, closeIdx] with single placeholder token for current local expression
+                    // Instead, compute the current sub tokens after the operation from the msg tail (it includes the current local tokens string)
+                    // Simpler: re-evaluate partial sub state by applying changes to a local copy and reconstructing global string.
+                    // We'll capture the current local tokens state by parsing msg's arrow tail
+                    localSteps.push(msg);
+                    // build display of full expression after this particular operation:
+                    // determine the latest local tokens by extracting after '→' if present
+                    const arrowPos = msg.indexOf('→');
+                    let currentLocal = msg;
+                    if (arrowPos !== -1) {
+                        currentLocal = msg.slice(arrowPos + 1).trim();
+                    } else {
+                        currentLocal = tokensToString(sub);
+                    }
+                    // Build displayTokens: replace range openIdx..closeIdx with currentLocal (a string)
+                    const display = toks.slice(0, openIdx).concat([currentLocal]).concat(toks.slice(closeIdx + 1));
+                    recStep(display.join(' '));
+                };
+
+                // Evaluate the subexpression and capture steps; but we also want readable steps for the sub only
+                // We'll implement evalFlat again but using localStepCb to build global displays.
+                // Parse sub, run evalFlat on it with a callback that reports local operations and updates global display.
+                // For that, we'll maintain a local copy inside evalFlat.
+                const localStepsCollector = [];
+                const localCb = (msg) => {
+                    // msg describes an operation on local tokens and ends with '→  <local tokens>'
+                    localStepsCollector.push(msg);
+                    // Build and push global display: replace the subrange with the current local token string (after arrow)
+                    const arrow = msg.indexOf('→');
+                    let currentLocalStr = msg;
+                    if (arrow !== -1) {
+                        currentLocalStr = msg.slice(arrow + 1).trim();
+                    } else {
+                        currentLocalStr = tokensToString(sub);
+                    }
+                    // remove surrounding spaces and ensure parentheses show as a group
+                    const display = toks.slice(0, openIdx).concat([currentLocalStr]).concat(toks.slice(closeIdx + 1));
+                    recStep(display.join(' '));
+                };
+
+                // Evaluate the subflat
+                const subResult = evalFlat(sub, localCb);
+
+                // Replace entire '( ... )' with subResult formatted
+                toks.splice(openIdx, closeIdx - openIdx + 1, fmtNum(subResult));
+                recStep(`Brackets computed -> ${tokensToString(toks)}`);
+            }
+
+            // Now no parentheses left, evaluate the remaining flat expression
+            recStep(`Now evaluate: ${tokensToString(toks)}`);
+            const final = evalFlat(toks, (msg) => recStep(msg));
+            recStep(`Final result: ${fmtNum(final)}`);
+
+            return { result: final, steps };
+        }
+
+        // UI wiring
+        const btn = document.getElementById('btn-refresh');
+        const exprEl = document.getElementById('expression');
+        const stepsEl = document.getElementById('steps');
+        const resultEl = document.getElementById('final-result');
+        const copyBtn = document.getElementById('btn-copy');
+
+        function getSelectedOps() {
+            const ops = [];
+            if (document.getElementById('cb-mul').checked) ops.push('*');
+            if (document.getElementById('cb-div').checked) ops.push('/');
+            if (document.getElementById('cb-add').checked) ops.push('+');
+            if (document.getElementById('cb-sub').checked) ops.push('-');
+            return ops;
+        }
+
+        function generateAndShow() {
+            const selectedOps = getSelectedOps();
+            const allowBrackets = document.getElementById('cb-brackets').checked;
+            const numTermsInput = parseInt(document.getElementById('num-terms').value, 10) || 4;
+            const numTerms = Math.min(8, Math.max(2, numTermsInput));
+
+            if (selectedOps.length === 0) {
+                alert('Pick at least one of Multiplication, Division, Addition, or Subtraction.');
+                return;
+            }
+
+            const tokens = generateTokens(selectedOps, allowBrackets, numTerms);
+            exprEl.textContent = tokensToString(tokens);
+
+            // Evaluate and show steps
+            stepsEl.innerHTML = '';
+            resultEl.textContent = '…';
+            const { result, steps } = evaluateTokens(tokens);
+
+            // Render steps
+            steps.forEach((s, idx) => {
+                const div = document.createElement('div');
+                div.className = 'step';
+                div.textContent = `Step ${idx + 1}: ${s}`;
+                stepsEl.appendChild(div);
+            });
+
+            resultEl.textContent = fmtNum(result);
+        }
+
+        // initial generate
+        generateAndShow();
+
+        btn.addEventListener('click', generateAndShow);
+
+        copyBtn.addEventListener('click', () => {
+            const txt = exprEl.textContent;
+            navigator.clipboard?.writeText(txt).then(() => {
+                copyBtn.textContent = 'Copied!';
+                setTimeout(() => copyBtn.textContent = 'Copy Expression', 1100);
+            }).catch(() => {
+                alert('Copy failed. Select and copy manually: ' + txt);
+            });
+        });
+    </script>
+</body>
+</html>-->
