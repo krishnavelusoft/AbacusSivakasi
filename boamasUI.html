@@ -1,0 +1,417 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>BODMAS Step-by-step Evaluator</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <style>
+        body {
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+            max-width: 900px;
+            margin: 20px auto;
+            padding: 0 16px;
+            color: #111;
+        }
+
+        h1 {
+            margin-bottom: 6px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+        }
+
+        input[type=text] {
+            width: 100%;
+            padding: 8px 10px;
+            font-size: 1rem;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+        }
+
+        .row {
+            display: flex;
+            gap: 8px;
+            width: 100%;
+        }
+
+        button {
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid #bbb;
+            background: #fff;
+            cursor: pointer;
+        }
+
+            button.primary {
+                background: #0b76ef;
+                color: #fff;
+                border-color: #0b6ae7;
+            }
+
+        .panel {
+            margin-top: 12px;
+            padding: 12px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            background: #fafafa;
+        }
+
+        .expr {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 6px;
+            word-break: break-all;
+        }
+
+        .steps {
+            margin-top: 8px;
+        }
+
+        .step {
+            padding: 8px;
+            border-radius: 6px;
+            background: #fff;
+            border: 1px solid #eee;
+            margin-bottom: 8px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+
+        .error {
+            color: #b00020;
+            font-weight: 600;
+            margin-top: 8px;
+        }
+
+        .note {
+            font-size: .9rem;
+            color: #555;
+            margin-top: 8px;
+        }
+
+        .helpers {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 8px;
+        }
+
+        .sample {
+            padding: 6px 8px;
+            border-radius: 6px;
+            background: #fff;
+            border: 1px solid #eee;
+            cursor: pointer;
+        }
+
+        label.small {
+            font-size: .95rem;
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+    </style>
+</head>
+<body>
+    <h1>BODMAS Step-by-step Evaluator</h1>
+    <p>Type an arithmetic expression using +, -, *, / and parentheses. Click Evaluate to see a detailed step-by-step BODMAS execution.</p>
+
+    <div class="controls">
+        <div style="flex:1 1 600px;">
+            <input id="input-expr" type="text" placeholder="Example: (3 + 4) * 5 - 2/4" />
+        </div>
+        <div style="display:flex; gap:8px;">
+            <button id="btn-eval" class="primary">Evaluate</button>
+            <button id="btn-clear">Clear</button>
+        </div>
+    </div>
+
+    <div class="helpers">
+        <div class="small">Samples:</div>
+        <div class="sample" data-expr="(3 + 4) * 5 - 2/4">(3 + 4) * 5 - 2/4</div>
+        <div class="sample" data-expr="8/3 + 2 * (5 - 7)">8/3 + 2 * (5 - 7)</div>
+        <div class="sample" data-expr="-3 + 6 * (2 - 5)">-3 + 6 * (2 - 5)</div>
+        <div class="sample" data-expr="(2+3)*(4-6)/2">(2+3)*(4-6)/2</div>
+    </div>
+
+    <div class="panel">
+        <div><strong>Expression:</strong></div>
+        <div class="expr" id="expr-display">—</div>
+        <div><strong>Final result:</strong> <span id="final-result">—</span></div>
+        <div class="error" id="error-msg" style="display:none;"></div>
+
+        <div class="steps" id="steps"></div>
+
+        <div class="note">
+            Notes: The evaluator supports unary minus (e.g. -3 or -(2+1)), decimals, and follows BODMAS: parentheses first, then multiplication/division left-to-right, then addition/subtraction left-to-right. Division by zero and invalid inputs are reported as errors.
+        </div>
+    </div>
+
+    <script>
+    // Utilities
+    function isDigit(ch) { return ch >= '0' && ch <= '9'; }
+    function trim(s) { return s.replace(/^\s+|\s+$/g, ''); }
+    function fmtNum(n) {
+      if (!isFinite(n)) return String(n);
+      if (Math.abs(n - Math.round(n)) < 1e-12) return String(Math.round(n));
+      return parseFloat(n.toFixed(8)).toString().replace(/\.?0+$/, '');
+    }
+    function prettyOp(op) { return op === '*' ? '×' : op === '/' ? '÷' : op; }
+    function tokensToString(tokens) {
+      return tokens.map(t => (t === '*' || t === '/' ? prettyOp(t) : String(t))).join(' ');
+    }
+
+    // Tokenizer: supports numbers (with decimals), operators + - * /, parentheses.
+    // Handles unary minus: if '-' at start or after '(' or another operator, and followed by number, it becomes part of the number; if followed by '(' we insert '0' before '-'
+    function tokenize(input) {
+      const s = trim(input);
+      const tokens = [];
+      let i = 0;
+      while (i < s.length) {
+        const ch = s[i];
+
+        if (ch === ' ' || ch === '\t') { i++; continue; }
+
+        // number (with optional leading sign handled below)
+        if (isDigit(ch) || ch === '.') {
+          let j = i;
+          while (j < s.length && (isDigit(s[j]) || s[j] === '.')) j++;
+          const numStr = s.slice(i, j);
+          if ((numStr.match(/\./g) || []).length > 1) throw new Error('Invalid number: multiple decimal points');
+          tokens.push(numStr);
+          i = j;
+          continue;
+        }
+
+        if (ch === '+' || ch === '*' || ch === '/' ) {
+          tokens.push(ch);
+          i++;
+          continue;
+        }
+
+        if (ch === '-') {
+          const prev = tokens.length ? tokens[tokens.length - 1] : null;
+          const prevIsOperator = prev === null || prev === '+' || prev === '-' || prev === '*' || prev === '/' || prev === '(';
+          const next = (i + 1) < s.length ? s[i + 1] : null;
+          if (prevIsOperator) {
+            // unary minus
+            if (next === '(') {
+              // convert "-(" into "0 - ("
+              tokens.push('0');
+              tokens.push('-');
+              i++;
+              continue;
+            } else {
+              // read negative number
+              let j = i + 1;
+              if (j < s.length && s[j] === '.') { /* ok */ }
+              while (j < s.length && (isDigit(s[j]) || s[j] === '.')) j++;
+              if (j === i + 1) throw new Error('Invalid unary minus usage');
+              const numStr = s.slice(i, j); // includes leading '-'
+              if ((numStr.match(/\./g) || []).length > 1) throw new Error('Invalid number: multiple decimal points');
+              tokens.push(numStr);
+              i = j;
+              continue;
+            }
+          } else {
+            // binary minus
+            tokens.push('-');
+            i++;
+            continue;
+          }
+        }
+
+        if (ch === '(' || ch === ')') {
+          tokens.push(ch);
+          i++;
+          continue;
+        }
+
+        throw new Error('Invalid character: ' + ch);
+      }
+      return tokens;
+    }
+
+    // Flat evaluation with step recording. Throws on division by zero.
+    function evalFlat(tokens, stepCallback) {
+      let toks = tokens.slice();
+      // check tokens sequence validity
+      if (toks.length === 0) throw new Error('Empty expression');
+
+      // pass 1: * and /
+      let i = 0;
+      while (i < toks.length) {
+        const tok = toks[i];
+        if (tok === '*' || tok === '/') {
+          const a = parseFloat(toks[i - 1]);
+          const b = parseFloat(toks[i + 1]);
+          if (!isFinite(a) || !isFinite(b)) throw new Error('Invalid operand');
+          if (tok === '/' && Math.abs(b) < 1e-15) throw new Error('Division by zero');
+          let res = tok === '*' ? a * b : a / b;
+          res = parseFloat(res.toFixed(12));
+          toks.splice(i - 1, 3, fmtNum(res));
+          stepCallback(`${fmtNum(a)} ${prettyOp(tok)} ${fmtNum(b)} = ${fmtNum(res)}  →  ${tokensToString(toks)}`);
+          i = Math.max(0, i - 2);
+        } else i++;
+      }
+
+      // pass 2: + and -
+      i = 0;
+      while (i < toks.length) {
+        const tok = toks[i];
+        if (tok === '+' || tok === '-') {
+          const a = parseFloat(toks[i - 1]);
+          const b = parseFloat(toks[i + 1]);
+          if (!isFinite(a) || !isFinite(b)) throw new Error('Invalid operand');
+          let res = tok === '+' ? a + b : a - b;
+          res = parseFloat(res.toFixed(12));
+          toks.splice(i - 1, 3, fmtNum(res));
+          stepCallback(`${fmtNum(a)} ${tok} ${fmtNum(b)} = ${fmtNum(res)}  →  ${tokensToString(toks)}`);
+          i = Math.max(0, i - 2);
+        } else i++;
+      }
+
+      if (toks.length !== 1) throw new Error('Could not fully reduce expression');
+      const final = parseFloat(toks[0]);
+      if (!isFinite(final)) throw new Error('Invalid final result');
+      return final;
+    }
+
+    // Evaluate tokens that may include parentheses. Returns {result, steps}
+    function evaluateTokens(tokens) {
+      const steps = [];
+      function recStep(text) { steps.push(text); }
+
+      let toks = tokens.slice();
+
+      // validate parentheses pairs
+      let depth = 0;
+      for (const t of toks) {
+        if (t === '(') depth++;
+        if (t === ')') depth--;
+        if (depth < 0) throw new Error('Mismatched parentheses');
+      }
+      if (depth !== 0) throw new Error('Mismatched parentheses');
+
+      // Evaluate innermost parentheses first
+      while (toks.includes('(')) {
+        // find last '('
+        let openIdx = -1;
+        for (let i = 0; i < toks.length; i++) if (toks[i] === '(') openIdx = i;
+        const closeIdx = toks.indexOf(')', openIdx + 1);
+        if (openIdx === -1 || closeIdx === -1) throw new Error('Mismatched parentheses');
+
+        const sub = toks.slice(openIdx + 1, closeIdx);
+        if (sub.length === 0) throw new Error('Empty parentheses');
+
+        recStep(`Evaluate inside brackets: ${tokensToString(sub)}`);
+
+        // local callback to show progression within the brackets and show the full expression updated
+        const localCb = function(msg) {
+          // extract the part after arrow if present (→  <local tokens>)
+          const arrow = msg.indexOf('→');
+          let currentLocal = tokensToString(sub);
+          if (arrow !== -1) {
+            currentLocal = msg.slice(arrow + 1).trim();
+          }
+          const display = toks.slice(0, openIdx).concat([currentLocal]).concat(toks.slice(closeIdx + 1));
+          recStep(display.join(' '));
+        };
+
+        const subResult = evalFlat(sub, localCb);
+
+        // replace ( sub ) with result
+        toks.splice(openIdx, closeIdx - openIdx + 1, fmtNum(subResult));
+        recStep(`Brackets computed -> ${tokensToString(toks)}`);
+      }
+
+      // Now evaluate the remaining flat expression
+      recStep(`Now evaluate: ${tokensToString(toks)}`);
+      const final = evalFlat(toks, (msg) => recStep(msg));
+      recStep(`Final result: ${fmtNum(final)}`);
+
+      return { result: final, steps };
+    }
+
+    // UI wiring
+    const input = document.getElementById('input-expr');
+    const btnEval = document.getElementById('btn-eval');
+    const btnClear = document.getElementById('btn-clear');
+    const exprDisplay = document.getElementById('expr-display');
+    const stepsEl = document.getElementById('steps');
+    const resultEl = document.getElementById('final-result');
+    const errorEl = document.getElementById('error-msg');
+    const samples = document.querySelectorAll('.sample');
+
+    samples.forEach(s => {
+      s.addEventListener('click', () => {
+        input.value = s.getAttribute('data-expr');
+      });
+    });
+
+    function showError(msg) {
+      errorEl.style.display = 'block';
+      errorEl.textContent = msg;
+    }
+    function clearError() {
+      errorEl.style.display = 'none';
+      errorEl.textContent = '';
+    }
+
+    function evaluateInput() {
+      const text = input.value;
+      stepsEl.innerHTML = '';
+      exprDisplay.textContent = '—';
+      resultEl.textContent = '—';
+      clearError();
+      if (!trim(text)) { showError('Please enter an expression.'); return; }
+
+      let tokens;
+      try {
+        tokens = tokenize(text);
+      } catch (err) {
+        showError('Tokenize error: ' + err.message);
+        return;
+      }
+
+      exprDisplay.textContent = tokensToString(tokens);
+
+      let evalResult;
+      try {
+        evalResult = evaluateTokens(tokens);
+      } catch (err) {
+        showError('Evaluation error: ' + err.message);
+        return;
+      }
+
+      // render steps
+      evalResult.steps.forEach((s, idx) => {
+        const div = document.createElement('div');
+        div.className = 'step';
+        div.textContent = `Step ${idx + 1}: ${s}`;
+        stepsEl.appendChild(div);
+      });
+
+      resultEl.textContent = fmtNum(evalResult.result);
+    }
+
+    btnEval.addEventListener('click', evaluateInput);
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') evaluateInput(); });
+    btnClear.addEventListener('click', () => {
+      input.value = '';
+      stepsEl.innerHTML = '';
+      exprDisplay.textContent = '—';
+      resultEl.textContent = '—';
+      clearError();
+    });
+
+    // focus input on load
+    input.focus();
+    </script>
+</body>
+</html>
