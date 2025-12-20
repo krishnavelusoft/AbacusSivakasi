@@ -110,14 +110,14 @@
     </style>
 </head>
 <body>
-    <h1>Abacus Sivakasi</h1>
+    <h1>Abacus Sivakasi </h1>
     <div class="buttons">
         <button onclick="showPage('Consecutive')" class="active">Consecutive</button>
         <button onclick="showPage('ODDNumber')">ODD Number</button>
         <button onclick="showPage('evenNum')">EVEN Number</button>
         <button onclick="showPage('DQR')">Division Quotient & Remainder</button>
-        <button onclick="showPage('CC')">Callenge Corner</button>
-        <button onclick="showPage('BN')">Beacutiful Number</button>
+        <button onclick="showPage('CC')">Challenge Corner</button>
+        <button onclick="showPage('BN')">Beautiful Number</button>
         <button onclick="window.location.href='boamas.html'">BODMAS Auto Generation</button>
         <button onclick="window.location.href='boamasUI.html'">BODMAS User Input</button>
         <button onclick="showPage('contact')">Contact</button>
@@ -456,8 +456,8 @@
 
         <script>
             function generateTable() {
-                const startNum = parseInt(document.getElementById('startNumCC').value);
-                const subtractNum = parseInt(document.getElementById('subtractNumCC').value);
+                const startNum = parseFloat(document.getElementById('startNumCC').value);
+                const subtractNum = parseFloat(document.getElementById('subtractNumCC').value);
                 const tableBody = document.getElementById('tableBodyCC');
                 const table = document.getElementById('resultTableCC');
 
@@ -476,6 +476,7 @@
                     }
 
                     currentValue -= subtractNum;
+                    currentValue=currentValue.toFixed(2);
                     step++;
                 }
 
